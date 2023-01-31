@@ -97,7 +97,7 @@ function External() {
                   disabled={!factor.enabled}>
                   {factor.name}
                 </Button>
-               {factor.enabled && <Button style={{marginLeft: 10}} onClick={e => handle(e, () => deleteMFAEnrollment(factor.id))}
+               {factor.enabled && <Button style={{marginLeft: 10}} onClick={e => handle(e, () => deleteMFAEnrollment(factor.name))}
                   color="danger"
                   className="mt-5">
                   Unenroll
