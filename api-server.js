@@ -43,18 +43,18 @@ const checkJwt = jwt({
   algorithms: ['RS256']
 });
 
-async function requestManagementAPIAccessToken() {
-  const body = {
+async function requestManagementAPIAccessToken(audience, grantAccess) {
+  const body = JSON.stringify({
     client_id: auth0ClientId,
     client_secret: auth0Secret,
-    audience: 'https://abrahamjsb.us.auth0.com/api/v2/',
-    grant_type: 'client_credentials'
-  };
+    audience: audience || 'https://abrahamjsb.us.auth0.com/api/v2/',
+    grant_type: grantAccess || 'client_credentials'
+  });
   try {
-    const request = await fetch(baseUrl + '/oauth/token', {
-      body: JSON.stringify(body),
+    const request = await fetch(issuerBaseUrl + '/oauth/token', {
+      body,
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 'content-type': 'application/json' }
     });
     const response = await request.json();
     return response.access_token;
@@ -73,8 +73,9 @@ app.get('/api/factors', checkJwt, async (req, res) => {
   try {
     const accessToken = await requestManagementAPIAccessToken();
     const requestFactors = await fetch(`${issuerBaseUrl}/api/v2/guardian/factors`, {
-      headers: { Authorization: `Bearer ${accessToken}` }
+      headers: { Authorization: `Bearer ${accessToken}`, 'content-type': 'application/json' }
     });
+
     const responseFactors = await requestFactors.json();
     res.status(200).send(responseFactors);
   } catch (error) {
