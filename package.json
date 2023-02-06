@@ -3,10 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "concurrently \"next dev\" \"nodemon api-server\"",
+    "dev": "concurrently \"next dev\"",
     "dev:api": "nodemon api-server",
     "build": "next build",
-    "start": "concurrently \"next start\" \"node api-server\"",
+    "start": "concurrently \"next start\"",
     "start:api": "node api-server",
     "test": "jest tests --coverage --maxWorkers=10",
     "test:watch": "jest --coverage --watch",
