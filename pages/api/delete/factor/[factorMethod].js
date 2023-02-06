@@ -9,7 +9,7 @@ export default withApiAuthRequired(async function deleteFactor(req, res) {
       scopes: ['profile']
     });
     const apiPort = process.env.API_PORT || 3001;
-    const response = await fetch(`http://localhost:${apiPort}/api/factors/${factorMethod}/delete/${userId}`, {
+    const response = await fetch(`http://localhost:${apiPort}/api/users/${userId}/factors/${factorMethod}`, {
       headers: {
         Authorization: `Bearer ${accessToken}`
       },

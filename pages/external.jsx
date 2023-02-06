@@ -1,22 +1,23 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Button } from 'reactstrap';
+import { Button, Alert } from 'reactstrap';
 import { useUser, withPageAuthRequired } from '@auth0/nextjs-auth0/client';
 
 import Loading from '../components/Loading';
 import ErrorMessage from '../components/ErrorMessage';
+import { useRouter,  } from 'next/router';
 
 function External() {
   const { user, isLoading: isLoadingUser } = useUser();
   const [mfaList, setMfaList] = useState({ isLoading: false, response: undefined, error: undefined });
-  const [existTicket, setExistTicket] = useState(undefined);
-
-
+  const router = useRouter();
+  const unenroll = Boolean(router.query.unenroll);
+  
 
   const fetchMfa = useCallback(async () => {
     setMfaList(previous => ({ ...previous, isLoading: true }));
 
     try {
-      const response = await fetch(`/api/factors`);
+      const response = await fetch(`/api/factors?id=${user?.sub}`);
       const data = await response.json();
 
       setMfaList(previous => ({ ...previous, response: data, error: undefined }));
@@ -25,7 +26,7 @@ function External() {
     } finally {
       setMfaList(previous => ({ ...previous, isLoading: false }));
     }
-  }, []);
+  }, [user]);
 
   const handle = (event, fn) => {
     event.preventDefault();
@@ -34,39 +35,53 @@ function External() {
 
   const requestEnrollmentTicket = useCallback(async () => {
     try {
-      const response = await fetch('/api/enrollment', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: user?.sub, user_email: user.email, send_email: false })
+      const response = await fetch(`/api/enrollment?id=${user?.sub}`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' }
       });
       const data = await response.json();
-
-      setExistTicket(data.ticket_url);
+      if (data.user_metadata.requestedMFA) {
+        router.push(`/api/auth/login`);
+      }
     } catch (error) {
       console.log(error);
     }
   }, [user]);
 
-   const deleteMFAEnrollment = useCallback(async (factorId) => {
+  const deleteMFAEnrollment = useCallback(async () => {
     try {
-      await fetch(`/api/delete/factor/${factorId}?userId=${user?.sub}`);
-      fetchMfa();
-    } catch(error) {
-      console.log(error)
+     
+      const request = await fetch(`/api/disable-multifactor`);
+      const response = await request.json();
+      const returnTo = new URL('http://localhost:3000/external?unenroll=true');
+      if (response.code === 'mfaRequired') {
+        router.push(`/api/auth/login?returnTo=${returnTo.toString()}`);
+      } else {
+        router.push(`/api/auth/logout`);
+      }
+    } catch (error) {
+      console.log(error);
     }
-   }, [user])
+  }, [user]);
+
+  const deleteMFAWithConfirmation = useCallback(() => {
+    const deleteMFAConfirmation = confirm(
+      'Are you sure you want delete MFA for your account? If you accept you will be logout from your account once deactivated'
+    );
+    if(!deleteMFAConfirmation) deleteMFAEnrollment();
+
+  }, [deleteMFAEnrollment])
 
   useEffect(() => {
     fetchMfa();
   }, []);
 
   useEffect(() => {
-    if (existTicket) {
-      window.open(existTicket, 'target');
-      setExistTicket(undefined);
+    console.log("UNENROLL IN EFFECT IS HAPPENING", unenroll)
+    if(unenroll) {
+      deleteMFAEnrollment();
     }
-  }, [existTicket]);
-
+  }, [unenroll])
 
   return (
     <>
@@ -86,30 +101,28 @@ function External() {
             for more info).
           </p>
           <h2>MFA list</h2>
-          {mfaList.error && <ErrorMessage>{mfaList.error.message}</ErrorMessage>}
-          {!isLoadingUser && mfaList.response ? (
+          <Button
+            onClick={
+              user.amr?.length > 0 ? e => handle(e, deleteMFAWithConfirmation) : e => handle(e, requestEnrollmentTicket)
+            }
+            color="primary"
+            className="mt-5">
+            {user.amr?.length > 0 ? 'Unenroll' : 'Enroll'} in MFA
+          </Button>
+          <br />
+          {mfaList.response &&
+            mfaList.response.length > 0 &&
             mfaList.response.map(factor => (
               <div key={factor.name}>
-                <Button
-                  onClick={e => handle(e, requestEnrollmentTicket)}
-                  color="primary"
-                  className="mt-5"
-                  disabled={!factor.enabled}>
-                  {factor.name}
-                </Button>
-               {factor.enabled && <Button style={{marginLeft: 10}} onClick={e => handle(e, () => deleteMFAEnrollment(factor.name))}
-                  color="danger"
-                  className="mt-5">
-                  Unenroll
-                </Button>}
+                <Alert color="primary" style={{ marginTop: 10 }}>
+                  User enrolled with {factor.type}!
+                </Alert>
               </div>
-            ))
-          ) : (
-            <div>Loading factors...</div>
-          )}
-        </div>
+            ))}
+          {!isLoadingUser && !mfaList.isLoading && !mfaList.response && <div>User not enrolled in MFA</div>}
 
-   
+          {isLoadingUser || (mfaList.isLoading && <div>Loading factors...</div>)}
+        </div>
       </div>
     </>
   );

@@ -1,19 +1,19 @@
 import { getAccessToken, withApiAuthRequired } from '@auth0/nextjs-auth0';
+import requestManagementAPIAccessToken, { issuerBaseUrl } from '../../utils/requestManagementAPIAccessToken';
 
 export default withApiAuthRequired(async function factors(req, res) {
   try {
+    const { id } = req.query;
     const { accessToken } = await getAccessToken(req, res, {
       scopes: ['profile']
     });
-    const apiPort = process.env.API_PORT || 3001;
-    const response = await fetch(`http://localhost:${apiPort}/api/factors`, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`
-      }
+    const managementAccessToken = await requestManagementAPIAccessToken();
+    const requestFactors = await fetch(`${issuerBaseUrl}/api/v2/users/${id}/enrollments`, {
+      headers: { Authorization: `Bearer ${managementAccessToken}`, 'content-type': 'application/json' }
     });
-    const factors = await response.json();
 
-    res.status(200).json(factors);
+    const responseFactors = await requestFactors.json();
+    res.status(200).send(responseFactors);
   } catch (error) {
     res.status(error.status || 500).json({ error: error.message });
   }
